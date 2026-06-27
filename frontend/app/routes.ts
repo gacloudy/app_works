@@ -6,6 +6,5 @@ export default [
     route("stocks", "routes/stocks.tsx"),
     route("stocks/:code", "routes/stocks.$code.tsx"),
     route("chart", "routes/chart.tsx"),
-    route("patterns", "routes/patterns.tsx"),
   ]),
 ] satisfies RouteConfig;
