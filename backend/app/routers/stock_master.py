@@ -8,8 +8,11 @@ router = APIRouter(prefix="/stock-master", tags=["stock-master"])
 
 
 @router.get("/", response_model=list[StockMasterResponse])
-def list_stocks(db: Session = Depends(get_db)):
-    return db.query(StockMaster).order_by(StockMaster.code).all()
+def list_stocks(is_delisted: bool | None = None, db: Session = Depends(get_db)):
+    q = db.query(StockMaster).order_by(StockMaster.code)
+    if is_delisted is not None:
+        q = q.filter(StockMaster.is_delisted == is_delisted)
+    return q.all()
 
 
 @router.get("/{code}", response_model=StockMasterResponse)

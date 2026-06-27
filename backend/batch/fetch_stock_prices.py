@@ -32,6 +32,7 @@ load_dotenv()
 from app.database import SessionLocal
 from app.models.stock_master import StockMaster
 from app.models.stock_price import StockPrice
+from app.models.batch_fetch_log import BatchFetchLog
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -265,6 +266,16 @@ def fetch_stock_data(client: httpx.Client, code: str) -> dict | None:
 # DB 書き込み
 # ---------------------------------------------------------------------------
 
+def insert_fetch_log(run_id: str, code: str, status: str, reason: str, source: str | None = None) -> None:
+    """スキップ・エラーを batch_fetch_log に記録する。失敗しても例外を伝播させない。"""
+    try:
+        with SessionLocal() as db:
+            db.add(BatchFetchLog(run_id=run_id, code=code, status=status, reason=reason, source=source))
+            db.commit()
+    except Exception as exc:
+        log.warning("バッチログのDB書き込み失敗: %s", exc)
+
+
 def upsert_price(db, code: str, data: dict) -> str:
     """stock_price に upsert する。戻り値は 'insert' または 'update'。"""
     existing = (
@@ -288,7 +299,8 @@ def upsert_price(db, code: str, data: dict) -> str:
 
 def main() -> None:
     start_dt = datetime.now()
-    log.info("=== 株価取得バッチ 開始 ===")
+    run_id = start_dt.strftime("%Y%m%d_%H%M%S")
+    log.info("=== 株価取得バッチ 開始 (run_id=%s) ===", run_id)
 
     today = date.today()
     log.info("本日: %s", today)
@@ -310,12 +322,14 @@ def main() -> None:
                 data = fetch_stock_data(client, code)
             except Exception as exc:
                 log.error("[%s] 予期しないエラー: %s", code, exc)
+                insert_fetch_log(run_id, code, "error", f"予期しないエラー: {exc}")
                 errors += 1
                 time.sleep(FETCH_DELAY)
                 continue
 
             if data is None:
                 log.warning("[%s] 取得失敗 → スキップ", code)
+                insert_fetch_log(run_id, code, "skip", "Nomura・Yahoo ともに取得失敗")
                 skipped += 1
                 time.sleep(FETCH_DELAY)
                 continue
@@ -323,6 +337,7 @@ def main() -> None:
             # 現在値が取れなければ登録スキップ
             if data.get("current_price") is None:
                 log.warning("[%s] 現在値を取得できず → スキップ", code)
+                insert_fetch_log(run_id, code, "skip", "現在値を取得できず", data.get("source"))
                 skipped += 1
                 time.sleep(FETCH_DELAY)
                 continue
@@ -331,6 +346,7 @@ def main() -> None:
             page_date = data.get("trade_date")
             if page_date is None:
                 log.warning("[%s] ページ日付を解析できず → スキップ", code)
+                insert_fetch_log(run_id, code, "skip", "ページ日付を解析できず", data.get("source"))
                 skipped += 1
                 time.sleep(FETCH_DELAY)
                 continue

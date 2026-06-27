@@ -64,6 +64,19 @@ def get_latest_prices(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/{code}/history", response_model=list[StockPriceDetail])
+def get_price_history(code: str, days: int = 60, db: Session = Depends(get_db)):
+    """指定銘柄の直近 days 件の株価を昇順で返す。"""
+    rows = (
+        db.query(StockPrice)
+        .filter(StockPrice.code == code, StockPrice.is_delisted == False)  # noqa: E712
+        .order_by(StockPrice.trade_date.desc())
+        .limit(days)
+        .all()
+    )
+    return list(reversed(rows))
+
+
 @router.get("/{code}/latest", response_model=StockPriceDetail)
 def get_latest_price_by_code(code: str, db: Session = Depends(get_db)):
     """指定銘柄の最新取引日の株価を返す。"""

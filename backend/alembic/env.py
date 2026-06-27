@@ -12,8 +12,9 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.database import Base
-import app.models.stock_master  # noqa: F401
-import app.models.stock_price   # noqa: F401
+import app.models.stock_master     # noqa: F401
+import app.models.stock_price      # noqa: F401
+import app.models.batch_fetch_log  # noqa: F401
 
 config = context.config
 
