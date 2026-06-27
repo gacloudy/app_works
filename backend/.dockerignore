@@ -1,9 +1,8 @@
-.env
 .venv/
+.env
 __pycache__/
 *.pyc
 *.pyo
-.pytest_cache/
 *-service-account.json
 *-key.json
 xenon-depth-342814-4b5b81678de6.json
